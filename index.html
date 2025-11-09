@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Riverwood AI Voice Agent</title>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif; display:flex; flex-direction:column; align-items:center; padding-top:30px;}
+    #chat-box{width:420px; min-height:220px; border:1px solid #ddd; border-radius:8px; background:#fff; padding:12px; overflow:auto;}
+    #user-input{width:320px; padding:8px; margin-top:12px;}
+    #send-btn{padding:9px 12px; margin-left:8px;}
+  </style>
+</head>
+<body>
+  <h2>🏡 Riverwood AI Voice Agent</h2>
+  <div id="chat-box"></div>
+  <div>
+    <input id="user-input" placeholder="Type message..." />
+    <button id="send-btn">Send</button>
+  </div>
+  <audio id="voice" controls style="margin-top:12px; display:block;"></audio>
+
+  <script>
+    const box = document.getElementById("chat-box");
+    const input = document.getElementById("user-input");
+    const sendBtn = document.getElementById("send-btn");
+    const audioEl = document.getElementById("voice");
+
+    function addLine(who, text) {
+      box.innerHTML += `<p><b>${who}:</b> ${text}</p>`;
+      box.scrollTop = box.scrollHeight;
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") sendMessage(); });
+
+    async function sendMessage() {
+      const message = input.value.trim();
+      if (!message) return;
+      addLine("You", message);
+      input.value = "";
+      try {
+        const res = await fetch("http://127.0.0.1:8000/chat", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({message})
+        });
+        const data = await res.json();
+
+        if (data.error) {
+          addLine("Error", data.error);
+          return;
+        }
+        addLine("AI", data.reply || "[no reply]");
+
+        // convert base64 → blob url and play
+        const b64 = data.audio;
+        const blob = base64ToBlob(b64, "audio/mpeg");
+        const url = URL.createObjectURL(blob);
+        audioEl.src = url;
+        audioEl.play().catch(()=>{/*autoplay may be blocked; user can click play*/});
+
+      } catch (err) {
+        addLine("Error", "Request failed: " + err.message);
+      }
+    }
+
+    function base64ToBlob(b64, mime) {
+      const byteChars = atob(b64);
+      const byteNumbers = new Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) {
+        byteNumbers[i] = byteChars.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      return new Blob([byteArray], {type: mime});
+    }
+  </script>
+</body>
+</html>
